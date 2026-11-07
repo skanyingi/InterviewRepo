@@ -8,12 +8,19 @@ export interface CurrentUser {
   role: Role;
 }
 
+export interface AuthenticitySummary {
+  level: 'low' | 'medium' | 'high';
+  score: number;
+  reasons: string[];
+}
+
 export interface InviteAssessmentSummary {
   id: string;
   status: string;
   totalScore: number | null;
   applicantUsername: string;
   smsStatus: string | null;
+  aiSummary: AuthenticitySummary | null;
 }
 
 export interface Invite {
@@ -51,6 +58,7 @@ export interface Answer {
   text: string;
   score: number | null;
   feedback: string | null;
+  aiScore?: number | null;
 }
 
 export interface Assessment {
@@ -80,6 +88,15 @@ export interface AdminAssessment {
   totalScore: number | null;
   applicantUsername: string;
   smsStatus: string | null;
+  aiSummary: AuthenticitySummary | null;
+}
+
+export interface AnswerSignals {
+  questionId: string;
+  focusMs: number;
+  keystrokes: number;
+  pasteCount: number;
+  pastedChars: number;
 }
 
 async function readError(response: Response): Promise<string> {
@@ -155,11 +172,12 @@ export async function getAssessment(id: string): Promise<Assessment> {
 export async function submitAnswers(
   id: string,
   answers: { questionId: string; text: string }[],
+  signals?: AnswerSignals[],
 ): Promise<void> {
   const response = await fetch(`/api/assessments/${encodeURIComponent(id)}/answers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answers }),
+    body: JSON.stringify({ answers, signals }),
   });
   if (!response.ok) throw new Error(await readError(response));
 }

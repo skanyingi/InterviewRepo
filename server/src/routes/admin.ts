@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { assessments, smsLogs, users } from '../db/schema.js';
+import { assessments, answers, smsLogs, users } from '../db/schema.js';
 import { requireRole } from '../auth/session.js';
 import { asyncHandler } from '../http.js';
+import { summarizeAnswers } from '../services/authenticity.js';
 
 export const adminRouter = Router();
 
@@ -89,10 +90,34 @@ adminRouter.get(
       }
     }
 
+    const authenticityByAssessment = new Map<string, ReturnType<typeof summarizeAnswers>>();
+    if (ids.length > 0) {
+      const answerRows = await db
+        .select({
+          assessmentId: answers.assessmentId,
+          text: answers.text,
+          signals: answers.signals,
+          aiScore: answers.aiScore,
+        })
+        .from(answers)
+        .where(inArray(answers.assessmentId, ids));
+
+      const grouped = new Map<string, typeof answerRows>();
+      for (const row of answerRows) {
+        const list = grouped.get(row.assessmentId) ?? [];
+        list.push(row);
+        grouped.set(row.assessmentId, list);
+      }
+      for (const [assessmentId, rows] of grouped) {
+        authenticityByAssessment.set(assessmentId, summarizeAnswers(rows));
+      }
+    }
+
     res.json(
       rows.map((row) => ({
         ...row,
         smsStatus: latestSmsStatus.get(row.id) ?? null,
+        aiSummary: authenticityByAssessment.get(row.id) ?? null,
       })),
     );
   }),

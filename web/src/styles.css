@@ -430,6 +430,12 @@ textarea {
   color: var(--text-muted);
 }
 
+.list .hint {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--accent);
+}
+
 .user {
   display: flex;
   align-items: center;

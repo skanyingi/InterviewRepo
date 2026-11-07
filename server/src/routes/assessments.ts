@@ -7,12 +7,13 @@ import { asyncHandler } from '../http.js';
 import { fetchRepoContext } from '../services/github.js';
 import { generateQuestions, gradeAnswers } from '../services/gemini.js';
 import { normalizeKenyanPhone, sendSms } from '../services/sms.js';
+import { estimateAiAssistance, parseSignals, summarizeAnswers } from '../services/authenticity.js';
 
 export const assessmentsRouter = Router();
 
 type Assessment = InferSelectModel<typeof assessments>;
 
-async function assessmentPayload(assessment: Assessment) {
+async function assessmentPayload(assessment: Assessment, includeHints = false) {
   const questionRows = await db
     .select()
     .from(questions)
@@ -42,7 +43,9 @@ async function assessmentPayload(assessment: Assessment) {
       text: answer.text,
       score: answer.score,
       feedback: answer.feedback,
+      ...(includeHints ? { aiScore: answer.aiScore } : {}),
     })),
+    ...(includeHints ? { aiSummary: summarizeAnswers(answerRows) } : {}),
   };
 }
 
@@ -185,7 +188,9 @@ assessmentsRouter.get(
       return;
     }
 
-    res.json(await assessmentPayload(assessment));
+    res.json(
+      await assessmentPayload(assessment, user.role === 'admin' || user.role === 'recruiter'),
+    );
   }),
 );
 
@@ -250,14 +255,28 @@ assessmentsRouter.post(
       return;
     }
 
+    const signalsInput = Array.isArray(req.body?.signals) ? req.body.signals : [];
+    const signalsByQuestion = new Map<string, ReturnType<typeof parseSignals>>();
+    for (const item of signalsInput as Array<{ questionId?: unknown }>) {
+      if (typeof item?.questionId === 'string' && questionIds.has(item.questionId)) {
+        signalsByQuestion.set(item.questionId, parseSignals(item));
+      }
+    }
+
     await db.transaction(async (tx) => {
       await tx.delete(answers).where(eq(answers.assessmentId, assessment.id));
       await tx.insert(answers).values(
-        parsed.map((answer) => ({
-          questionId: answer.questionId,
-          assessmentId: assessment.id,
-          text: answer.text,
-        })),
+        parsed.map((answer) => {
+          const signals = signalsByQuestion.get(answer.questionId) ?? null;
+          const estimate = estimateAiAssistance(answer.text.length, signals);
+          return {
+            questionId: answer.questionId,
+            assessmentId: assessment.id,
+            text: answer.text,
+            signals: signals ? JSON.stringify(signals) : null,
+            aiScore: estimate?.score ?? null,
+          };
+        }),
       );
       await tx
         .update(assessments)
@@ -289,7 +308,7 @@ assessmentsRouter.post(
     }
 
     if (assessment.status === 'scored' || assessment.status === 'sms_sent') {
-      res.json(await assessmentPayload(assessment));
+      res.json(await assessmentPayload(assessment, user.role === 'admin'));
       return;
     }
 
@@ -361,7 +380,7 @@ assessmentsRouter.post(
       .from(assessments)
       .where(eq(assessments.id, assessment.id))
       .limit(1);
-    res.json(await assessmentPayload(updatedRows[0]));
+    res.json(await assessmentPayload(updatedRows[0], user.role === 'admin'));
   }),
 );
 

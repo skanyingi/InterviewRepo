@@ -69,6 +69,24 @@ Open http://localhost:5173.
 5. Answers are scored (0–10 each, total percentage).
 6. Applicant enters a Kenyan phone number, consents, and receives the score by SMS.
 
+## Deploy (single service)
+
+The Express server serves the built frontend (`web/dist`), so frontend and API share one origin — no CORS and cookies just work.
+
+- Build command: `npm install && npm run build`
+- Start command: `npm start` (runs DB migrations, then the server)
+- Set env vars in your host's dashboard (never commit `.env`):
+  `NODE_ENV=production`, `PORT`, `WEB_ORIGIN=https://your-domain`,
+  `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
+  `GITHUB_CALLBACK_URL=https://your-domain/api/auth/github/callback`,
+  `GEMINI_API_KEY`, `GEMINI_MODEL`,
+  `THRIVEVAS_API_KEY`, `THRIVEVAS_SENDER_ID`,
+  `THRIVEVAS_CALLBACK_URL=https://your-domain/api/sms/dlr`
+- Update the GitHub OAuth app callback to the deployed URL above.
+- `WEB_ORIGIN` must be the deployed URL (it is where users land after OAuth).
+- **SQLite persistence:** most hosts reset the filesystem on deploy. Mount a persistent disk and set `DB_FILE=/data/repointerview.db`; otherwise data resets on each deploy.
+- The ThriveVAS delivery callback also needs this public URL to receive delivery reports.
+
 ## Scripts
 
 ```bash

@@ -1,10 +1,12 @@
 import { createClient } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
+import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as schema from './schema.js';
 
+const defaultDbPath = fileURLToPath(new URL('../../repointerview.db', import.meta.url));
 const dbPath = pathToFileURL(
-  fileURLToPath(new URL('../../repointerview.db', import.meta.url)),
+  process.env.DB_FILE ? resolve(process.env.DB_FILE) : defaultDbPath,
 ).href;
 
 export const client = createClient({ url: dbPath });

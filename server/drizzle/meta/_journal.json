@@ -15,6 +15,13 @@
       "when": 1794058721653,
       "tag": "0001_sturdy_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794065102308,
+      "tag": "0002_milky_wrecker",
+      "breakpoints": true
     }
   ]
 }

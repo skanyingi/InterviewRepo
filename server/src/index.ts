@@ -2,6 +2,9 @@ import 'dotenv/config';
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { loadSession, requireAuth } from './auth/session.js';
 import { authRouter } from './routes/auth.js';
@@ -38,6 +41,15 @@ app.use('/api/invites', invitesRouter);
 app.use('/api/repos', reposRouter);
 app.use('/api/assessments', assessmentsRouter);
 app.use('/api/sms', smsRouter);
+
+const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
+
+if (existsSync(webDist)) {
+  app.use(express.static(webDist));
+  app.get(/^(?!\/api(?:\/|$)).*/, (_req, res) => {
+    res.sendFile(join(webDist, 'index.html'));
+  });
+}
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });

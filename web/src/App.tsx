@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   createAssessment,
   createInvite,
@@ -16,6 +16,7 @@ import {
   updateUserRole,
   type AdminAssessment,
   type AdminUser,
+  type AnswerSignals,
   type Assessment,
   type CurrentUser,
   type Invite,
@@ -312,6 +313,15 @@ function RecruiterDashboard() {
                     · SMS: {invite.assessment.smsStatus ?? 'not sent'}
                   </span>
                 )}
+                {invite.assessment?.aiSummary && (
+                  <span className="hint">
+                    AI hint: {invite.assessment.aiSummary.level}
+                    {invite.assessment.aiSummary.reasons.length > 0
+                      ? ` — ${invite.assessment.aiSummary.reasons.join(', ')}`
+                      : ''}{' '}
+                    (advisory)
+                  </span>
+                )}
               </div>
               <button type="button" onClick={() => handleCopy(invite)}>
                 {copied === invite.token ? 'Copied!' : 'Copy link'}
@@ -433,6 +443,20 @@ function AssessmentView({ id }: { id: string }) {
   const [phone, setPhone] = useState('');
   const [consentSms, setConsentSms] = useState(false);
   const [smsBusy, setSmsBusy] = useState(false);
+  const signalsRef = useRef<
+    Record<string, { focusMs: number; keystrokes: number; pasteCount: number; pastedChars: number }>
+  >({});
+  const focusStartRef = useRef<Record<string, number>>({});
+
+  function ensureSignal(questionId: string) {
+    signalsRef.current[questionId] ??= {
+      focusMs: 0,
+      keystrokes: 0,
+      pasteCount: 0,
+      pastedChars: 0,
+    };
+    return signalsRef.current[questionId];
+  }
 
   useEffect(() => {
     getAssessment(id)
@@ -472,12 +496,31 @@ function AssessmentView({ id }: { id: string }) {
     setBusy(true);
     setError(null);
     try {
+      const now = Date.now();
+      const signals: AnswerSignals[] = assessment!.questions.map((question) => {
+        const signal = signalsRef.current[question.id] ?? {
+          focusMs: 0,
+          keystrokes: 0,
+          pasteCount: 0,
+          pastedChars: 0,
+        };
+        const startedAt = focusStartRef.current[question.id];
+        return {
+          questionId: question.id,
+          focusMs: signal.focusMs + (startedAt ? now - startedAt : 0),
+          keystrokes: signal.keystrokes,
+          pasteCount: signal.pasteCount,
+          pastedChars: signal.pastedChars,
+        };
+      });
+
       await submitAnswers(
         id,
         assessment!.questions.map((question) => ({
           questionId: question.id,
           text: answers[question.id] ?? '',
         })),
+        signals,
       );
       setAssessment({ ...assessment!, status: 'submitted' });
     } catch (err) {
@@ -542,6 +585,24 @@ function AssessmentView({ id }: { id: string }) {
                 onChange={(event) =>
                   setAnswers((current) => ({ ...current, [question.id]: event.target.value }))
                 }
+                onFocus={() => {
+                  focusStartRef.current[question.id] = Date.now();
+                }}
+                onBlur={() => {
+                  const startedAt = focusStartRef.current[question.id];
+                  if (startedAt) {
+                    ensureSignal(question.id).focusMs += Date.now() - startedAt;
+                    delete focusStartRef.current[question.id];
+                  }
+                }}
+                onKeyDown={() => {
+                  ensureSignal(question.id).keystrokes += 1;
+                }}
+                onPaste={(event) => {
+                  const signal = ensureSignal(question.id);
+                  signal.pasteCount += 1;
+                  signal.pastedChars += event.clipboardData.getData('text').length;
+                }}
                 rows={3}
                 readOnly={readOnly}
                 placeholder="Type your answer…"
@@ -672,6 +733,15 @@ function AdminPanel() {
                   @{assessment.applicantUsername} · {assessment.status} · SMS:{' '}
                   {assessment.smsStatus ?? 'not sent'}
                 </span>
+                {assessment.aiSummary && (
+                  <span className="hint">
+                    AI hint: {assessment.aiSummary.level}
+                    {assessment.aiSummary.reasons.length > 0
+                      ? ` — ${assessment.aiSummary.reasons.join(', ')}`
+                      : ''}{' '}
+                    (advisory)
+                  </span>
+                )}
               </div>
               <strong>{assessment.totalScore !== null ? `${assessment.totalScore}%` : '—'}</strong>
             </li>

@@ -96,6 +96,8 @@ export const answers = sqliteTable('answers', {
   text: text('text').notNull(),
   score: integer('score'),
   feedback: text('feedback'),
+  signals: text('signals'),
+  aiScore: integer('ai_score'),
 });
 
 export const smsLogs = sqliteTable('sms_logs', {

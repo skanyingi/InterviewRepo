@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { assessments, invites, smsLogs, users } from '../db/schema.js';
+import { assessments, answers, invites, smsLogs, users } from '../db/schema.js';
 import { requireRole } from '../auth/session.js';
 import { asyncHandler } from '../http.js';
 import { config } from '../config.js';
+import { summarizeAnswers } from '../services/authenticity.js';
 
 export const invitesRouter = Router();
 
@@ -85,6 +86,29 @@ invitesRouter.get(
       }
     }
 
+    const authenticityByAssessment = new Map<string, ReturnType<typeof summarizeAnswers>>();
+    if (assessmentIds.length > 0) {
+      const answerRows = await db
+        .select({
+          assessmentId: answers.assessmentId,
+          text: answers.text,
+          signals: answers.signals,
+          aiScore: answers.aiScore,
+        })
+        .from(answers)
+        .where(inArray(answers.assessmentId, assessmentIds));
+
+      const grouped = new Map<string, typeof answerRows>();
+      for (const row of answerRows) {
+        const list = grouped.get(row.assessmentId) ?? [];
+        list.push(row);
+        grouped.set(row.assessmentId, list);
+      }
+      for (const [assessmentId, rows] of grouped) {
+        authenticityByAssessment.set(assessmentId, summarizeAnswers(rows));
+      }
+    }
+
     const assessmentByInvite = new Map(
       assessmentRows.map((row) => [
         row.inviteId,
@@ -94,6 +118,7 @@ invitesRouter.get(
           totalScore: row.totalScore,
           applicantUsername: row.applicantUsername,
           smsStatus: latestSmsStatus.get(row.id) ?? null,
+          aiSummary: authenticityByAssessment.get(row.id) ?? null,
         },
       ]),
     );
