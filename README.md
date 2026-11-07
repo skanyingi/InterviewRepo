@@ -49,7 +49,7 @@ Copy `server/.env.example` to `server/.env` and fill in:
 | `THRIVEVAS_API_KEY`, `THRIVEVAS_SENDER_ID` | ThriveVAS credentials (sender ID must be registered on the account) |
 | `THRIVEVAS_CALLBACK_URL` | Delivery-report webhook (needs a public URL in production) |
 
-Never commit `.env` — 
+Never commit `.env` — It is gitiginored.
 
 ## Run
 
