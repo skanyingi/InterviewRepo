@@ -87,6 +87,10 @@ The Express server serves the built frontend (`web/dist`), so frontend and API s
 - **SQLite persistence:** most hosts reset the filesystem on deploy. Mount a persistent disk and set `DB_FILE=/data/repointerview.db`; otherwise data resets on each deploy.
 - The ThriveVAS delivery callback also needs this public URL to receive delivery reports.
 
+**Sanity check after deploy:** `https://your-domain/api/health` must return `{"ok":true}` as JSON.
+If it returns HTML, the host is serving the static build instead of the Node service — OAuth
+redirects and all `/api/*` calls will fail (the browser gets `index.html`).
+
 ## Scripts
 
 ```bash
