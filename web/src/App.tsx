@@ -254,6 +254,7 @@ function RecruiterDashboard() {
   const [focusArea, setFocusArea] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [showAllInvites, setShowAllInvites] = useState(false);
 
   useEffect(() => {
     listInvites()
@@ -296,39 +297,52 @@ function RecruiterDashboard() {
       {invites.length === 0 ? (
         <p className="muted">No invites yet.</p>
       ) : (
-        <ul className="list">
-          {invites.map((invite) => (
-            <li key={invite.id}>
-              <div>
-                <strong>{invite.focusArea}</strong>
-                <span>
-                  {invite.status} · {new Date(invite.createdAt).toLocaleDateString()}
-                </span>
-                {invite.assessment && (
+        <>
+          <ul className="list">
+            {(showAllInvites ? invites : invites.slice(0, 1)).map((invite) => (
+              <li key={invite.id}>
+                <div>
+                  <strong>{invite.focusArea}</strong>
                   <span>
-                    @{invite.assessment.applicantUsername} ·{' '}
-                    {invite.assessment.totalScore !== null
-                      ? `${invite.assessment.totalScore}%`
-                      : invite.assessment.status}{' '}
-                    · SMS: {invite.assessment.smsStatus ?? 'not sent'}
+                    {invite.status} · {new Date(invite.createdAt).toLocaleDateString()}
                   </span>
-                )}
-                {invite.assessment?.aiSummary && (
-                  <span className="hint">
-                    AI hint: {invite.assessment.aiSummary.level}
-                    {invite.assessment.aiSummary.reasons.length > 0
-                      ? ` — ${invite.assessment.aiSummary.reasons.join(', ')}`
-                      : ''}{' '}
-                    (advisory)
-                  </span>
-                )}
-              </div>
-              <button type="button" onClick={() => handleCopy(invite)}>
-                {copied === invite.token ? 'Copied!' : 'Copy link'}
-              </button>
-            </li>
-          ))}
-        </ul>
+                  {invite.assessment && (
+                    <span>
+                      @{invite.assessment.applicantUsername} ·{' '}
+                      {invite.assessment.totalScore !== null
+                        ? `${invite.assessment.totalScore}%`
+                        : invite.assessment.status}{' '}
+                      · SMS: {invite.assessment.smsStatus ?? 'not sent'}
+                    </span>
+                  )}
+                  {invite.assessment?.aiSummary && (
+                    <span className="hint">
+                      AI hint: {invite.assessment.aiSummary.level}
+                      {invite.assessment.aiSummary.reasons.length > 0
+                        ? ` — ${invite.assessment.aiSummary.reasons.join(', ')}`
+                        : ''}{' '}
+                      (advisory)
+                    </span>
+                  )}
+                </div>
+                <button type="button" onClick={() => handleCopy(invite)}>
+                  {copied === invite.token ? 'Copied!' : 'Copy link'}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {invites.length > 1 && (
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => setShowAllInvites((current) => !current)}
+            >
+              {showAllInvites
+                ? 'Hide older invites'
+                : `Show ${invites.length - 1} older invite${invites.length - 1 === 1 ? '' : 's'}`}
+            </button>
+          )}
+        </>
       )}
     </section>
   );
